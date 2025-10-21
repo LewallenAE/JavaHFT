@@ -1,0 +1,42 @@
+<groupId>com.quant</groupId>
+<artifactId>JavaHFT</artifactId>
+<version>1.0-SNAPSHOT</version>
+<packaging>jar</packaging>
+<name>QuantDemoMVP</name>
+
+<properties>
+<maven.compiler.source>17</maven.compiler.source>
+<maven.compiler.target>17</maven.compiler.target>
+<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+</properties>
+
+<build>
+<plugins>
+    <!-- 1. JAR PLUGIN WITH MAIN CLASS -->
+    <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.3.0</version>
+        <configuration>
+            <archive>
+                <manifest>
+                    <mainClass>JavaHFTDemo</mainClass> <!-- MUST MATCH YOUR CLASS -->
+                </manifest>
+            </archive>
+        </configuration>
+    </plugin>
+
+    <!-- 2. AWS BEANSTALK PLUGIN -->
+    <plugin>
+        <groupId>com.amazonaws</groupId>
+        <artifactId>aws-elasticbeanstalk-maven-plugin</artifactId>
+        <version>1.4.2</version>
+        <configuration>
+            <environmentName>JavaHFT-env</environmentName>
+            <applicationName>TwoSigmaMVP</applicationName>
+            <region>us-east-1</region>
+            <solutionStackName>64bit Amazon Linux 2023 v4.0.1 running Java 17 Corretto</solutionStackName>
+        </configuration>
+    </plugin>
+</plugins>
+</build>
