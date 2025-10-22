@@ -52,7 +52,7 @@ Building this project required diving deep into:
 
 **For Students:**  
 If you're building something similar for learning, happy to discuss design 
-decisions. Reach out on [LinkedIn](your-linkedin-url).
+decisions. Reach out on [LinkedIn](https://www.linkedin.com/in/anthony-lewallen/).
 
 ---
 
