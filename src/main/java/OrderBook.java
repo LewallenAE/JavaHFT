@@ -5,8 +5,7 @@ import java.util.*;
  *
  * Centra Limit Order Book: (CLOB) with price-time priority
  *
- * Architecture:
- *
+ * Architecture
  * - Bids stored in descending price order (highest first)
  * - Asks stored in ascending price order (lowest first)
  * - Each price level maintains FIFO queue of orders
@@ -30,6 +29,9 @@ public class OrderBook {
     // Trade History
     private final List<Trade> trades;
 
+    // Order index for O(1) Lookup
+    private final Map<Long, OrderLocation> orderIndex;
+
     // Statics
     private int totalOrdersProcessed;
     private long totalVolumeTraded;
@@ -45,6 +47,7 @@ public class OrderBook {
         this.trades = new ArrayList<>();
         this.totalOrdersProcessed = 0;
         this.totalVolumeTraded = 0;
+        this.orderIndex = new HashMap<>();
     }
 
     /**
@@ -55,6 +58,8 @@ public class OrderBook {
     public void addOrder(Order order) {
         totalOrdersProcessed++;
 
+        // Set status to active
+        order.setStatus(Order.Status.ACTIVE);
 
         // Add to the appropriate side
         TreeMap<Double, LinkedList<Order>> targetBook =
@@ -67,6 +72,11 @@ public class OrderBook {
         // Add to end of queue (FIFO)
         priceLevel.addLast(order);
 
+        // Add to index for fast lookup
+        orderIndex.put(
+                order.getOrderId(),
+                new OrderLocation(order, order.getPrice(), order.getType())
+        );
 
         System.out.printf("Added: %s\n", order);
 
@@ -123,6 +133,9 @@ public class OrderBook {
             if(bestBid.isFilled()) {
                 bidQueue.removeFirst(); // Remove from FIFO queue
 
+                // Remove from index
+                orderIndex.remove(bestBid.getOrderId());
+
                 // If price level is now empty, remove it entirely
                 if (bidQueue.isEmpty()) {
                     bids.remove(bestBidPrice);
@@ -132,6 +145,9 @@ public class OrderBook {
 
             if (bestAsk.isFilled()) {
                 askQueue.removeFirst();
+
+                // Remove from index
+                orderIndex.remove(bestAsk.getOrderId());
 
                 // If price level is now empty, remove it entirely
                 if (askQueue.isEmpty()) {
@@ -143,6 +159,96 @@ public class OrderBook {
         }
     }
 
+    /**
+     * Cancel an order by ID
+     *
+     * @param
+     * @return
+     */
+    public boolean cancelOrder(long orderId) {
+        // Step 1: Look up order location via HashMap
+        OrderLocation location = orderIndex.get(orderId);
+
+        // Step2: Check if order exists
+        if (location == null) {
+            System.out.printf("Cancel failed: order #%d not found.\n", orderId);
+            return false;
+        }
+
+        Order order = location.getOrder();
+
+        // Step 3: Check if order is still active
+        if (order.getStatus() == Order.Status.FILLED ||
+            order.getStatus() == Order.Status.CANCELLED) {
+            System.out.printf("Cancel failed: Order #%d already %s\n", orderId, order.getStatus());
+            return false;
+        }
+
+        // Step 4: Get teh appropriate side of the book
+        TreeMap<Double, LinkedList<Order>> targetBook = (location.getSide() == Order.Type.BID) ? bids : asks;
+
+        // Step 5: Get the price level queue
+        LinkedList<Order> priceLevel = targetBook.get(location.getPriceLevel());
+
+        if (priceLevel == null) {
+            System.out.printf("Cancel failed: Price level %.2f not found \n",
+                    location.getPriceLevel());
+            return false;
+        }
+
+        // Step 6: Remove order from the queue
+        boolean removed = priceLevel.remove(order);
+
+        if(!removed) {
+            System.out.printf("Cancel failed Order #%d not in price level \n", orderId);
+            return false;
+        }
+
+        // Step 7: If price level is now empty. remove it
+        if (priceLevel.isEmpty()) {
+            targetBook.remove(location.getPriceLevel());
+        }
+
+        // Step8; Update Order Status
+        order.setStatus(Order.Status.CANCELLED);
+
+        // Step 9: Remove from index
+        orderIndex.remove(orderId);
+
+        System.out.printf("Cancelled: %s\n", order);
+        return true;
+    }
+
+    /**
+     *
+     * Get order by ID (without removing it)
+     */
+
+    public Order getOrder(long orderId) {
+        OrderLocation location = orderIndex.get(orderId);
+        return (location != null) ? location.getOrder() : null;
+    }
+
+    /**
+     * Check if an order exists and if it's active
+     */
+    public boolean isOrderActive(long orderId) {
+        Order order = getOrder(orderId);
+        return order != null &&
+                (order.getStatus() == Order.Status.ACTIVE ||
+                        order.getStatus() == Order.Status.PARTIAL_FILL);
+    }
+
+    /**
+     * Get all active orders for debugging and display
+     */
+    public List<Order> getAllActiveOrders() {
+        return orderIndex.values().stream()
+                .map(OrderLocation::getOrder)
+                .filter(o -> o.getStatus() == Order.Status.ACTIVE ||
+                        o.getStatus() == Order.Status.PARTIAL_FILL)
+                .toList();
+    }
 
     /**
      *
@@ -262,7 +368,7 @@ public class OrderBook {
 
         System.out.println("\n=== STATISTICS ===");
         System.out.printf("Total Orders: %d\n", totalOrdersProcessed);
-        System.out.printf("Total Trade: %d\n", trades.size());
+        System.out.printf("Total Trades: %d\n", trades.size());
         System.out.printf("Total Volume: %d shares\n", totalVolumeTraded);
 
         Double midPrice = getMidPrice();
