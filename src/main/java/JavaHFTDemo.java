@@ -4,6 +4,31 @@ public class JavaHFTDemo {
 
         OrderBook book = new OrderBook();
 
+        System.out.println("=== Market Orders Demo ===");
+
+        // Build Liquidity
+        book.addOrder(new Order(Order.Type.BID, 150.00, 100));
+        book.addOrder(new Order(Order.Type.BID,  149.00, 200));
+        book.addOrder(new Order(Order.Type.BID,  160.00, 200));
+
+        book.addOrder(new Order(Order.Type.ASK,  151.00, 50));
+        book.addOrder(new Order(Order.Type.ASK,  165.00, 100));
+        book.addOrder(new Order(Order.Type.ASK,  153.00, 75));
+
+        book.printBook();
+
+        // Test Market Buy
+        System.out.println("\n--- Market Buy: 200 Shares ---");
+        book.addOrder(Order.createMarketOrder(Order.Type.BID, 200));
+
+        book.printBook();
+
+        System.out.println("\n === End MarketOrder Demo ===");
+        System.out.println();
+        System.out.println();
+        System.out.println();
+
+
         System.out.println("=== JavaHFT Matching Engine Demo ===\n");
 
         // Add some orders
@@ -49,7 +74,7 @@ public class JavaHFTDemo {
         System.out.println("Result: " + (cancelled ? "SUCCESS" : "FAILED") + "\n");
 
         // Cancel non-existent order should print fail
-        System.out.println("--- Try to cencel non-existing order ---\n");
+        System.out.println("--- Try to cancel non-existing order ---\n");
         System.out.println("Attempting to cancel order #99999");
         cancelled = book.cancelOrder(99999);
         System.out.println("Result: " + (cancelled ? "SUCCESS" : "FAILED") + "\n");

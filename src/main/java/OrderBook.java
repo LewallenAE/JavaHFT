@@ -56,6 +56,13 @@ public class OrderBook {
      */
 
     public void addOrder(Order order) {
+
+        // This market order check must be first
+        if (order.isMarketOrder()) {
+            executeMarketOrder(order);
+            return;  // market orders don't go into the book
+        }
+
         totalOrdersProcessed++;
 
         // Set status to active
@@ -341,6 +348,115 @@ public class OrderBook {
         }
         return (bids.firstKey() + asks.firstKey()) / 2.0;
     }
+
+    /**
+     * Execute Market order immediately by walking through price levels
+     * @param marketOrder the market order to execute
+     * @return List of trades generated
+     */
+    public List<Trade> executeMarketOrder(Order marketOrder) {
+        if (!marketOrder.isMarketOrder()) {
+            throw new IllegalArgumentException("Order is not a market order");
+        }
+
+        totalOrdersProcessed++;
+        marketOrder.setStatus(Order.Status.ACTIVE);
+
+        List<Trade> marketTrades = new ArrayList<>();
+
+        System.out.printf("Executing market order: %s\n", marketOrder);
+
+        // Determine which side to take liquidity from
+        TreeMap<Double, LinkedList<Order>> targetBook =
+                (marketOrder.getType() == Order.Type.BID) ? asks : bids;
+
+        // Keep matching until market order is filled or book is empty
+        while (!marketOrder.isFilled() && !targetBook.isEmpty()) {
+
+            // Get best price level
+            Double bestPrice = targetBook.firstKey();
+            LinkedList<Order> priceLevel = targetBook.get(bestPrice);
+
+            // Get the first ordered at this price level
+            Order counterOrder = priceLevel.getFirst();
+
+            // Calculate trade quantity
+            int tradeQuantity = Math.min(
+                    marketOrder.getRemainingQuantity(),
+                    counterOrder.getRemainingQuantity()
+            );
+
+            // Execute at maker's price (the resting order's price)
+            double tradePrice = bestPrice;
+
+            // Create trade with correct buyer / seller order
+            Trade trade;
+            if (marketOrder.getType() == Order.Type.BID) {
+                // Market buy takes from asks
+                trade = new Trade(
+                        marketOrder.getOrderId(),
+                        counterOrder.getOrderId(),
+                        tradePrice,
+                        tradeQuantity
+                );
+            } else {
+                // Market sells hits bids
+                trade = new Trade(
+                        counterOrder.getOrderId(),
+                        marketOrder.getOrderId(),
+                        tradePrice,
+                        tradeQuantity
+                );
+            }
+            trades.add(trade);
+            marketTrades.add(trade);
+            totalVolumeTraded += tradeQuantity;
+
+            System.out.println(trade);
+
+            // Update quantities
+            marketOrder.fill(tradeQuantity);
+            counterOrder.fill(tradeQuantity);
+
+            // Remove filled counter order
+            if (counterOrder.isFilled()) {
+                priceLevel.removeFirst();
+                orderIndex.remove(counterOrder.getOrderId());
+
+                // Remove empty price level
+                if (priceLevel.isEmpty()) {
+                    targetBook.remove(bestPrice);
+                }
+            }
+
+
+        }
+
+        // Check if market order was fully filled
+        if (!marketOrder.isFilled()) {
+            int filledQuantity = marketOrder.getQuantity() - marketOrder.getRemainingQuantity();
+
+            if (filledQuantity == 0) {
+                // if no fills, order is REJECTED
+                marketOrder.setStatus(Order.Status.REJECTED);
+                System.out.printf("x REJECTED: Market order #%d - no liquidity available (0/%d shares)\n",
+                        marketOrder.getOrderId(),
+                        marketOrder.getQuantity());
+            } else {
+                // Otherwise if PARTIALLY FILLED status set to PARTIAL_FILL
+                marketOrder.setStatus(Order.Status.PARTIAL_FILL);
+                System.out.printf("Warning: Market order #%d partially filled (%d/%d shares)\n",
+                        marketOrder.getOrderId(),
+                        filledQuantity,
+                        marketOrder.getQuantity());
+            }
+        }
+
+        return marketTrades;
+
+    }
+
+
     /**
      *
      * Display current order book state

@@ -12,15 +12,18 @@ public class Order implements Comparable<Order>{
         ACTIVE,             // In the order book, waiting to match
         PARTIAL_FILL,       // Some quantity filled, still active
         FILLED,             // Completely filled
-        CANCELLED           // User cancelled
+        CANCELLED,           // User cancelled
+        REJECTED
     }
+
     private final Type type;
-    private final double price;
+    private final Double price;
     private final int quantity;
     private long orderID;
     private long timeStamp;
     private int remainingQuantity;
     private Status status;
+    private final boolean isMarketOrder;
 
     public Order(Type type, double price, int quantity) {
         this.orderID = ID_Generator.incrementAndGet();
@@ -30,6 +33,19 @@ public class Order implements Comparable<Order>{
         this.remainingQuantity = quantity;
         this.timeStamp = System.nanoTime();
         this.status = Status.NEW;
+        this.isMarketOrder = false;
+
+    }
+
+    private Order(Type type, int quantity, boolean isMarketOrder) {
+        this.orderID = ID_Generator.incrementAndGet();
+        this.type = type;
+        this.price = null;
+        this.quantity = quantity;
+        this.remainingQuantity = quantity;
+        this.timeStamp = System.nanoTime();
+        this.status = Status.NEW;
+        this.isMarketOrder = isMarketOrder;
     }
 
     public long getOrderId() { return orderID;}
@@ -42,6 +58,14 @@ public class Order implements Comparable<Order>{
 
     public void setStatus(Status status) {
         this.status = status;
+    }
+
+    public boolean isMarketOrder() {
+        return isMarketOrder;
+    }
+
+    public static Order createMarketOrder(Type type, int quantity) {
+        return new Order(type, quantity, true);
     }
 
     public int fill(int fillQuantity) {
@@ -83,8 +107,13 @@ public class Order implements Comparable<Order>{
 
     @Override
     public String toString() {
-        return String.format("Order[id=%d, %s, $%.2f, qty=%d/%d, status=%s, ts=%d]",
-                orderID, type, price, remainingQuantity, quantity, status, timeStamp);
+        if (isMarketOrder) {
+            return String.format("Order[id=%d, %s, MARKET, qty=%d/%d, status=%s, ts=%d]",
+                    orderID, type, remainingQuantity, quantity, status, timeStamp);
+        } else {
+            return String.format("Order[id=%d, %s, $%.2f, qty=%d/%d, status=%s, ts=%d]",
+                    orderID, type, price, remainingQuantity, quantity, status, timeStamp);
+        }
     }
 
 }
