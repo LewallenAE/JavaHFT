@@ -1,39 +1,34 @@
 import java.util.ArrayList;
 import java.util.List;
 
-public class JavaHFTDemo {
+/**
+ * JavaHFT Quantitative Trading System
+ *
+ * Main orchestrator that connects:
+ * - Real market data (Yahoo Finance)
+ * - Quantitative trading strategies (Momentum, Mean Reversion, VWAP)
+ * - Order Book matching engine
+ * - Backtesting with P&L tracking
+ * - Chart generation (PNG + ASCII)
+ *
+ * Usage: java HFTSystem [SYMBOL] [RANGE]
+ *   SYMBOL: stock ticker (default: AAPL)
+ *   RANGE:  1mo, 3mo, 6mo, 1y, 2y (default: 6mo)
+ *
+ * @author Anthony Lewallen
+ */
+public class HFTSystem {
 
     private static final double INITIAL_CAPITAL = 100_000.00;
-    private static final String DEFAULT_SYMBOL = "AAPL";
-    private static final String DEFAULT_RANGE = "6mo";
+    private static final String CHART_DIR = "charts";
 
     public static void main(String[] args) {
 
-        String symbol = args.length > 0 ? args[0].toUpperCase() : DEFAULT_SYMBOL;
-        String range = args.length > 1 ? args[1] : DEFAULT_RANGE;
+        // Parse command line args
+        String symbol = args.length > 0 ? args[0].toUpperCase() : "AAPL";
+        String range = args.length > 1 ? args[1] : "6mo";
 
-        runQuantSystem(symbol, range);
-
-        System.out.println("\n=== JavaHFT Complete ===");
-        System.out.println("Built by Anthony E. Lewallen");
-        System.out.println("GitHub: https://github.com/LewallenAE/JavaHFT");
-
-    } // end of the main method
-
-    /**
-     * Runs the full quantitative trading system:
-     * - Fetches real market data from Yahoo Finance
-     * - Runs 3 trading strategies (Momentum, Mean Reversion, VWAP)
-     * - Backtests each strategy with P&L tracking
-     * - Generates PNG charts + ASCII terminal charts
-     * - Outputs a consensus trading recommendation
-     */
-    private static void runQuantSystem(String symbol, String range) {
-        System.out.println("=".repeat(60));
-        System.out.println("     JavaHFT - Quantitative Trading System");
-        System.out.println("     High-Frequency Trading Engine + Market Analysis");
-        System.out.println("     by Anthony E. Lewallen");
-        System.out.println("=".repeat(60));
+        printBanner();
         System.out.printf("  Symbol: %s | Range: %s | Capital: $%,.2f\n\n", symbol, range, INITIAL_CAPITAL);
 
         // === STEP 1: Fetch Real Market Data ===
@@ -95,28 +90,27 @@ public class JavaHFTDemo {
             result.printReport();
         }
 
-        // Strategy comparison table
+        // Print strategy comparison table
         printComparisonTable(results);
 
         // === STEP 5: Generate Charts ===
         System.out.println("\n[5/5] Generating charts...");
-        String chartDir = "charts";
         try {
             for (BacktestEngine.BacktestResult result : results) {
                 String safeName = result.strategyName.replaceAll("[^a-zA-Z0-9]", "_");
                 ChartRenderer.generatePriceChart(result,
-                        chartDir + "/" + symbol + "_" + safeName + "_price.png");
+                        CHART_DIR + "/" + symbol + "_" + safeName + "_price.png");
                 ChartRenderer.generateEquityChart(result,
-                        chartDir + "/" + symbol + "_" + safeName + "_equity.png");
+                        CHART_DIR + "/" + symbol + "_" + safeName + "_equity.png");
             }
             ChartRenderer.generateComparisonChart(results,
-                    chartDir + "/" + symbol + "_strategy_comparison.png");
+                    CHART_DIR + "/" + symbol + "_strategy_comparison.png");
         } catch (Exception e) {
-            System.out.println("  PNG chart generation failed: " + e.getMessage());
+            System.out.println("  PNG chart generation failed (headless environment?): " + e.getMessage());
             System.out.println("  Falling back to ASCII charts...");
         }
 
-        // ASCII charts for terminal
+        // Always print ASCII charts to terminal
         for (BacktestEngine.BacktestResult result : results) {
             System.out.printf("\n--- %s ---", result.strategyName);
             ChartRenderer.printAsciiPriceChart(result.quotes, result.signals, 80);
@@ -124,16 +118,21 @@ public class JavaHFTDemo {
         }
 
         // === FINAL: Current Recommendation ===
-        printRecommendation(strategies, quotes, symbol);
+        printCurrentRecommendation(strategies, quotes, symbol);
+
+        System.out.println("\n=== JavaHFT System Complete ===");
+        System.out.println("Built by Anthony E. Lewallen");
+        System.out.println("GitHub: https://github.com/LewallenAE/JavaHFT");
     }
 
-    private static void printRecommendation(List<TradingStrategy> strategies,
-                                             List<StockQuote> quotes, String symbol) {
+    private static void printCurrentRecommendation(List<TradingStrategy> strategies,
+                                                     List<StockQuote> quotes, String symbol) {
         System.out.println("\n" + "=".repeat(60));
         System.out.println("  CURRENT TRADING RECOMMENDATION");
         System.out.println("=".repeat(60));
 
         int buyVotes = 0, sellVotes = 0, holdVotes = 0;
+        double totalConfidence = 0;
 
         for (TradingStrategy strategy : strategies) {
             TradingSignal signal = strategy.evaluate(quotes, quotes.size() - 1, symbol);
@@ -143,8 +142,8 @@ public class JavaHFTDemo {
             System.out.printf("    Reason:     %s\n", signal.getReason());
 
             switch (signal.getAction()) {
-                case BUY -> buyVotes++;
-                case SELL -> sellVotes++;
+                case BUY -> { buyVotes++; totalConfidence += signal.getConfidence(); }
+                case SELL -> { sellVotes++; totalConfidence -= signal.getConfidence(); }
                 case HOLD -> holdVotes++;
             }
         }
@@ -191,4 +190,12 @@ public class JavaHFTDemo {
         System.out.println("=".repeat(90));
     }
 
-} // end Demo class
+    private static void printBanner() {
+        System.out.println();
+        System.out.println("=".repeat(60));
+        System.out.println("     JavaHFT - Quantitative Trading System");
+        System.out.println("     High-Frequency Trading Engine + Market Analysis");
+        System.out.println("     by Anthony E. Lewallen");
+        System.out.println("=".repeat(60));
+    }
+}
