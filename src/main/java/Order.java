@@ -1,23 +1,25 @@
 import java.util.concurrent.atomic.AtomicLong;
 
-public class Order implements Comparable<Order>{
+public class Order implements Comparable<Order> {
 
+    // $0.01 per tick -- all prices stored as integer ticks to avoid floating-point key bugs
+    static final int TICK_SIZE = 100;
 
     private static final AtomicLong ID_Generator = new AtomicLong(0);
 
-    public enum Type{ BID, ASK}
+    public enum Type { BID, ASK }
 
     public enum Status {
-        NEW,                // Just created not in book yet
-        ACTIVE,             // In the order book, waiting to match
-        PARTIAL_FILL,       // Some quantity filled, still active
-        FILLED,             // Completely filled
-        CANCELLED,           // User cancelled
+        NEW,
+        ACTIVE,
+        PARTIAL_FILL,
+        FILLED,
+        CANCELLED,
         REJECTED
     }
 
     private final Type type;
-    private final Double price;
+    private final long priceTicks;   // price in integer ticks (dollars x TICK_SIZE)
     private final int quantity;
     private long orderID;
     private long timeStamp;
@@ -28,19 +30,18 @@ public class Order implements Comparable<Order>{
     public Order(Type type, double price, int quantity) {
         this.orderID = ID_Generator.incrementAndGet();
         this.type = type;
-        this.price = price;
+        this.priceTicks = Math.round(price * TICK_SIZE);
         this.quantity = quantity;
         this.remainingQuantity = quantity;
         this.timeStamp = System.nanoTime();
         this.status = Status.NEW;
         this.isMarketOrder = false;
-
     }
 
     private Order(Type type, int quantity, boolean isMarketOrder) {
         this.orderID = ID_Generator.incrementAndGet();
         this.type = type;
-        this.price = null;
+        this.priceTicks = 0;
         this.quantity = quantity;
         this.remainingQuantity = quantity;
         this.timeStamp = System.nanoTime();
@@ -48,13 +49,16 @@ public class Order implements Comparable<Order>{
         this.isMarketOrder = isMarketOrder;
     }
 
-    public long getOrderId() { return orderID;}
-    public Type getType() {return type;}
-    public double getPrice() { return price; }
-    public int getQuantity() {return quantity;}
-    public int getRemainingQuantity() { return remainingQuantity;}
+    public long getOrderId() { return orderID; }
+    public Type getType() { return type; }
+    /** Returns price in dollars (for display and trade recording). */
+    public double getPrice() { return priceTicks / (double) TICK_SIZE; }
+    /** Returns price as integer ticks -- use this as TreeMap key. */
+    public long getPriceTicks() { return priceTicks; }
+    public int getQuantity() { return quantity; }
+    public int getRemainingQuantity() { return remainingQuantity; }
     public long getTimeStamp() { return timeStamp; }
-    public Status getStatus(){return status;}
+    public Status getStatus() { return status; }
 
     public void setStatus(Status status) {
         this.status = status;
@@ -80,7 +84,6 @@ public class Order implements Comparable<Order>{
         return actualFill;
     }
 
-
     public boolean isFilled() {
         return remainingQuantity == 0;
     }
@@ -92,10 +95,10 @@ public class Order implements Comparable<Order>{
         }
 
         int priceComparison;
-        if(this.type == Type.BID) {
-            priceComparison = Double.compare(other.price, this.price);
+        if (this.type == Type.BID) {
+            priceComparison = Long.compare(other.priceTicks, this.priceTicks);
         } else {
-            priceComparison = Double.compare(this.price, other.price);
+            priceComparison = Long.compare(this.priceTicks, other.priceTicks);
         }
 
         if (priceComparison != 0) {
@@ -112,10 +115,7 @@ public class Order implements Comparable<Order>{
                     orderID, type, remainingQuantity, quantity, status, timeStamp);
         } else {
             return String.format("Order[id=%d, %s, $%.2f, qty=%d/%d, status=%s, ts=%d]",
-                    orderID, type, price, remainingQuantity, quantity, status, timeStamp);
+                    orderID, type, getPrice(), remainingQuantity, quantity, status, timeStamp);
         }
     }
-
 }
-
-

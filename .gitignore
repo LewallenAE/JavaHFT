@@ -36,3 +36,6 @@ build/
 
 ### Mac OS ###
 .DS_Storecharts/
+
+### IntelliJ IDEA project directory ###
+.idea/
